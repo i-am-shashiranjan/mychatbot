@@ -482,7 +482,6 @@
         startAppButton.addEventListener('click', () => {
             welcomeScreen.classList.add('hidden');
             appContent.classList.remove('hidden');
-            setTimeout(() => { if (chatInput) chatInput.focus(); }, 100);
         });
 
         // --- FETCH API FOR AI RESPONSE (REPLACES IPCRENDERER) ---
@@ -533,7 +532,7 @@
                 
                 messages.push({ text: currentStreamingBubble.textContent, isUser: false });
                 updateStatus('Press microphone or spacebar to start recording');
-                if (chatInput) chatInput.focus();
+               
 
             } catch (error) {
                 hideTypingIndicator();
@@ -549,7 +548,7 @@
             
             addMessage(text, true);
             chatInput.value = '';
-            chatInput.focus();
+            // chatInput.focus();
             
             updateStatus('Generating answer...');
             showTypingIndicator();
