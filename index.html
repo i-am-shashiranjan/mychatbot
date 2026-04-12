@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Assistant</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #a5b4fc;
+            --gradient-start: #6366f1;
+            --gradient-end: #8b5cf6;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --background: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius-sm: 0.375rem;
+            --radius: 0.5rem;
+            --radius-lg: 0.75rem;
+            --transition: all 0.2s ease;
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background-color: var(--background);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.75rem;
+            line-height: 1.5;
+            font-size: 0.875rem;
+        }
+        
+        .container {
+            background: var(--card);
+            width: 100%;
+            min-width: 450px;
+            max-width: 90vw;
+            height: 85vh;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+        
+        /* Welcome Screen Styles */
+        .welcome-screen {
+            text-align: center;
+            padding: 2rem 1rem;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border-radius: var(--radius-lg);
+            color: white;
+            position: relative;
+            min-height: 300px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 4rem;
+        }
+        
+        .title-wrapper { margin-bottom: 1.5rem; }
+        
+        .product-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transform: translateY(1.25rem);
+            animation: fadeInUp 0.8s ease forwards;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.9);
+            opacity: 0;
+            transform: translateY(1.25rem);
+            animation: fadeInUp 0.8s ease 0.2s forwards;
+        }
+        
+        .product-description {
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.8);
+            max-width: 20rem;
+            margin: 0 auto;
+            line-height: 1.5;
+            opacity: 0;
+            transform: translateY(1.25rem);
+            animation: fadeInUp 0.8s ease 0.4s forwards;
+            margin-top: 0.75rem;
+        }
+        
+        .start-btn {
+            background: white;
+            color: var(--primary);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius);
+            font-weight: 600;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: var(--transition);
+            box-shadow: var(--shadow);
+            margin-top: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .product-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.8);
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(5px);
+            border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        }
+        
+        .product-footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+        
+        .product-footer a:hover { color: var(--primary-light); }
+        .heart-icon { color: #ff4d6d; animation: heartbeat 1.5s infinite; margin: 0 3px; }
+        
+        /* Chat App Content Styles */
+        .content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        /* Chat messages area */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            background-color: rgba(246, 248, 252, 0.5);
+        }
+        
+        .message {
+            display: flex;
+            margin-bottom: 0.5rem;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .message-user { justify-content: flex-end; }
+        .message-ai { justify-content: flex-start; }
+        
+        .message-content {
+            padding: 0.6rem 0.8rem;
+            border-radius: var(--radius);
+            max-width: 80%;
+            word-wrap: break-word;
+            box-shadow: var(--shadow-sm);
+            font-size: 0.85rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+        }
+        
+        .message-user .message-content {
+            background-color: var(--primary);
+            color: white;
+            border-radius: var(--radius) var(--radius-sm) var(--radius-sm) var(--radius);
+        }
+        
+        .message-ai .message-content {
+            background-color: white;
+            color: var(--text);
+            border-radius: var(--radius-sm) var(--radius) var(--radius) var(--radius-sm);
+            border-left: 4px solid var(--success);
+        }
+        
+        /* Controls area */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 0.9rem;
+            background-color: white;
+            border-top: 1px solid var(--border);
+        }
+        
+        .control-buttons {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            justify-content: center;
+        }
+        
+        .mic-button {
+            height: 3.5rem;
+            width: 3.5rem;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+        }
+        
+        .mic-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(99, 102, 241, 0.4);
+        }
+        
+        .mic-button.recording {
+            background: linear-gradient(135deg, var(--danger), #dc2626);
+            animation: pulse-button 2s infinite;
+            box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+        }
+        
+        .mic-button i {
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .reset-button {
+            height: 2.25rem;
+            width: 2.25rem;
+            border-radius: 50%;
+            background-color: #e5e7eb;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .reset-button:hover { background-color: #d1d5db; }
+        .reset-button i { font-size: 1rem; color: #4b5563; }
+        
+        .status-text {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-align: center;
+            margin-top: 0.5rem;
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* Animations */
+        @keyframes pulse-button {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(1.25rem); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Loading Animation */
+        .loading-dots { display: inline-flex; align-items: center; height: 20px; }
+        .loading-dot {
+            background-color: var(--primary);
+            width: 6px; height: 6px; border-radius: 50%; margin: 0 2px;
+            animation: loading-dots 1.4s infinite ease-in-out both;
+        }
+        .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes loading-dots {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        /* Text Input Area */
+        .text-input-container {
+            display: flex;
+            padding: 0.75rem;
+            background-color: white;
+            border-top: 1px solid var(--border);
+            gap: 0.5rem;
+        }
+        
+        #chatInput {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 2rem;
+            font-family: inherit;
+            font-size: 0.875rem;
+            outline: none;
+            transition: var(--transition);
+        }
+        
+        #chatInput:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-light);
+        }
+        
+        .send-button {
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 50%;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .send-button:hover {
+            background-color: var(--primary-dark);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    
+    <div class="container">
+        <div id="welcomeScreen" class="welcome-screen">
+            <div class="title-wrapper">
+                <h2 class="product-name">Angel</h2>
+                <h1 class="subtitle">AI Meeting Assistant</h1>
+                <p class="product-description">
+                    Silent, Smart, and Always On
+                </p>
+            </div>
+            <button class="start-btn" id="startApp">
+                <i class="fas fa-play"></i>
+                Start Assistant
+            </button>
+            <div class="product-footer">
+                <span>A product from </span>
+                <a href="https://lazyjobseeker.com" target="_blank">LazyJobSeeker.com</a>
+                <span style="margin: 0 5px;">•</span>
+                <span>Made with </span>
+                <i class="fas fa-heart heart-icon"></i>
+            </div>
+        </div>
+
+        <div id="appContent" class="content hidden">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message message-ai">
+                    <div class="message-content">
+                        Hello! I'm your AI meeting assistant. Press the microphone button to start recording, or type a question below.
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-input-container">
+                <input type="text" id="chatInput" placeholder="Type your question manually..." autocomplete="off">
+                <button id="sendButton" class="send-button">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+            
+            <div class="controls">
+                <div class="control-buttons">
+                    <button id="micButton" class="mic-button">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button id="resetButton" class="reset-button">
+                        <i class="fas fa-refresh"></i>
+                    </button>
+                </div>
+                <div id="statusText" class="status-text">
+                    Press microphone button or spacebar to start recording
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM Elements
+        const startAppButton = document.getElementById('startApp');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const appContent = document.getElementById('appContent');
+        const micButton = document.getElementById('micButton');
+        const resetButton = document.getElementById('resetButton');
+        const statusText = document.getElementById('statusText');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        
+        let isRecording = false;
+        let isProcessingToggle = false;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let messages = [];
+        let typingIndicatorElement = null;
+
+        // --- TYPING INDICATOR ---
+        function showLoadingAnimation() {
+            return `<div class="loading-dots">
+                <div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>
+            </div>`;
+        }
+
+        function showTypingIndicator() {
+            if (typingIndicatorElement) return; 
+            typingIndicatorElement = document.createElement('div');
+            typingIndicatorElement.className = 'message message-ai';
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.innerHTML = showLoadingAnimation(); 
+            typingIndicatorElement.appendChild(messageContent);
+            chatMessages.appendChild(typingIndicatorElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            if (typingIndicatorElement && typingIndicatorElement.parentNode) {
+                typingIndicatorElement.parentNode.removeChild(typingIndicatorElement);
+            }
+            typingIndicatorElement = null;
+        }
+
+        // --- MESSAGE HANDLING ---
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'message-user' : 'message-ai'}`;
+            const messageContent = document.createElement('div');
+            messageContent.className = 'message-content';
+            messageContent.textContent = text;
+            messageDiv.appendChild(messageContent);
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            messages.push({ text, isUser });
+        }
+        
+        function updateStatus(text) {
+            statusText.textContent = text;
+        }
+        
+        // Start App
+        startAppButton.addEventListener('click', () => {
+            welcomeScreen.classList.add('hidden');
+            appContent.classList.remove('hidden');
+            setTimeout(() => { if (chatInput) chatInput.focus(); }, 100);
+        });
+
+        // --- FETCH API FOR AI RESPONSE (REPLACES IPCRENDERER) ---
+        async function fetchStreamedAnswer(question) {
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                if (!response.ok) throw new Error("Server Error");
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+
+                hideTypingIndicator();
+                
+                // Create Bubble for Streaming Text
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message message-ai';
+                let currentStreamingBubble = document.createElement('div');
+                currentStreamingBubble.className = 'message-content';
+                messageDiv.appendChild(currentStreamingBubble);
+                chatMessages.appendChild(messageDiv);
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    const chunkStr = decoder.decode(value);
+                    const lines = chunkStr.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+                            try {
+                                const data = JSON.parse(line.replace('data: ', ''));
+                                if (data.text) {
+                                    currentStreamingBubble.textContent += data.text;
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error("Error parsing chunk", e);
+                            }
+                        }
+                    }
+                }
+                
+                messages.push({ text: currentStreamingBubble.textContent, isUser: false });
+                updateStatus('Press microphone or spacebar to start recording');
+                if (chatInput) chatInput.focus();
+
+            } catch (error) {
+                hideTypingIndicator();
+                updateStatus('Error connecting to server.');
+                console.error(error);
+            }
+        }
+
+        // --- MANUAL TEXT SUBMISSION ---
+        function sendManualMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            
+            addMessage(text, true);
+            chatInput.value = '';
+            chatInput.focus();
+            
+            updateStatus('Generating answer...');
+            showTypingIndicator();
+            
+            // Call Web API instead of IPC
+            fetchStreamedAnswer(text);
+        }
+
+        sendButton.addEventListener('click', sendManualMessage);
+        chatInput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                sendManualMessage();
+            }
+        });
+
+        // --- AUDIO RECORDING (WEB API) ---
+        async function toggleRecording() {
+            if (isProcessingToggle) return;
+            isProcessingToggle = true;
+            
+            try {
+                if (!isRecording) {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+
+                    // When recording finishes, send the blob to the server
+                    mediaRecorder.onstop = async () => {
+                        updateStatus('Transcribing audio...');
+                        showTypingIndicator();
+                        
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'recording.webm');
+                        
+                        try {
+                            const response = await fetch('/api/transcribe', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const data = await response.json();
+                            
+                            if (data.text && data.text.trim().length > 0) {
+                                addMessage(data.text, true);
+                                updateStatus('Generating answer...');
+                                fetchStreamedAnswer(data.text);
+                            } else {
+                                hideTypingIndicator();
+                                updateStatus('No speech detected. Please try again.');
+                            }
+                        } catch (error) {
+                            hideTypingIndicator();
+                            updateStatus('Error transcribing audio.');
+                        }
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    micButton.classList.add('recording');
+                    micButton.innerHTML = '<i class="fas fa-microphone-slash"></i>';
+                    updateStatus('Listening... Click microphone to stop');
+                } else {
+                    // Stop recording
+                    mediaRecorder.stop();
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                    
+                    isRecording = false;
+                    micButton.classList.remove('recording');
+                    micButton.innerHTML = '<i class="fas fa-microphone"></i>';
+                    updateStatus('Processing audio...');
+                }
+            } catch (error) {
+                console.error('Microphone error:', error);
+                updateStatus('Error accessing microphone.');
+            }
+            
+            setTimeout(() => { isProcessingToggle = false; }, 300);
+        }
+
+        micButton.addEventListener('click', toggleRecording);
+        
+        // --- RESET CONVERSATION ---
+        resetButton.addEventListener('click', async () => {
+            while (chatMessages.children.length > 1) {
+                chatMessages.removeChild(chatMessages.lastChild);
+            }
+            messages = messages.slice(0, 1);
+            updateStatus('Conversation reset.');
+            
+            // Clear memory on backend
+            await fetch('/api/reset', { method: 'POST' });
+        });
+
+        // Spacebar toggle
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Space' && 
+                document.activeElement.tagName !== 'INPUT' && 
+                document.activeElement.tagName !== 'TEXTAREA') {
+                event.preventDefault();
+                toggleRecording();
+            }
+        });
+        
+    </script>
+</body>
+</html>
