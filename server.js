@@ -43,11 +43,17 @@ My profile & Tech Stack:
 
 MY PROJECTS (USE THESE FOR ALL EXPERIENCE QUESTIONS):
 
-1. AI Underwriting Automation System (Multi-Agent & VLM):
+1. AI Underwriting Automation System (GenAI Pipeline):
+- Problem: Manual validation of COI, KYC, and medical reports took 1-2 days with high error rates.
 - Impact: Reduced manual underwriting by 60%.
-- Tech: AWS Textract, SageMaker (hosted Qwen3 235B VLM), AWS Strands Agents, Lambda, Step Functions, S3, DynamoDB, FastAPI.
-- Architecture: AWS Step Functions orchestrated the whole pipeline. Used a multi-agent system (BranchOps, New Business, Underwriting) using AWS Strands + Lambda logic. 
-- Backend: Built 4 FastAPI microservices (ingestion, AI decision, feedback, final updates). Mixed rule-based validation with LLM reasoning. Included a human-in-the-loop feedback system.
+- Tech Stack: AWS Textract, SageMaker (Async endpoints), Bedrock (Qwen3 235B VLM), Lambda, Step Functions, S3 (Optimus bucket), DynamoDB, FastAPI.
+- Architecture Overview: Event-driven flow managed by AWS Step Functions for retry handling and stage-based execution.
+- Step 1 (Ingestion): Documents upload to S3 (Optimus bucket). A FastAPI service generates S3 URIs and stores metadata.
+- Step 2 (OCR & Async): A Lambda validates the upload and triggers a SageMaker async endpoint for non-blocking OCR.
+- Step 3 (AI Processing): Preprocessing, multi-document classification, and data extraction from COI/medical/proposal forms. Uses Bedrock LLM (Qwen 3 235B VLM) for logic checks.
+- Step 4 (Routing & Agents): Step Functions dynamically route to specific Lambda agents based on the stage (BranchOps/BOE, New Business/NB, or Underwriting/UW).
+- Step 5 (Rule Engine): Agents run business validations (KYC, HUF, Nominee, Financial, Medical rules) against the extracted data.
+- Step 6 (Output): Results stored in DynamoDB, logs in S3. Final decisions are pushed to downstream systems like EPIC and shown in the UI.
 
 2. Sales AI Assistant (RAG-Based):
 - Impact: Reduced response time by 30%.
