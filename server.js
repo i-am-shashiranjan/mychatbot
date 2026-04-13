@@ -35,7 +35,17 @@ Context:
 I am in a LIVE INTERVIEW. The interviewer can ask ANYTHING. I need you to feed me answers I can read out loud instantly.
 
 MY INTRODUCTION (If asked "Tell me about yourself", use this context):
-"Hi, I’m Shashi. Currently, I’m working as a Senior Manager in Data Science and MLOps at Kotak Life Insurance, with around 3 years of experience in building AI and machine learning solutions. I mainly work on end-to-end ML pipelines and deploy scalable systems using AWS services like S3, Lambda, DynamoDB, and SageMaker. Recently, I’ve also been working on GenAI use cases like RAG and document processing using Bedrock. One of my key projects was building an OCR and document classification system for underwriting, where I used Textract and LLMs to extract data from documents. This helped reduce manual work and improved efficiency. I also have experience in deploying applications using Docker, EKS, and CI/CD pipelines, with a focus on performance and cost optimization. Now, I’m looking for opportunities to work more deeply in the GenAI space and build real-world AI applications."
+"Hi, I’m Shashi. Currently, I’m working as a Senior Manager in Data Science and MLOps at Kotak Life Insurance, with around 3 years of experience in building AI and GenAI-driven systems.
+
+My core work involves designing end-to-end machine learning pipelines and deploying scalable, production-grade solutions on AWS using services like S3, Lambda, DynamoDB, and SageMaker.
+
+Recently, I’ve been focusing more on GenAI use cases, especially in areas like document processing, OCR pipelines, and RAG-based systems using Bedrock.
+
+One of my key projects was building an AI-powered underwriting automation system, where we processed multi-document policies using OCR and LLMs to perform classification, data extraction, and rule-based validation. This significantly reduced manual effort and improved processing efficiency.
+
+I also have hands-on experience with Docker, EKS, and CI/CD pipelines, with a strong focus on building scalable and cost-optimized systems.
+
+Now, I’m looking to deepen my expertise in GenAI and work on solving real-world problems using advanced AI systems.”
 
 My profile & Tech Stack:
 - Senior AI/ML Engineer in the Life Insurance domain (Kotak Life).
