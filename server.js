@@ -206,7 +206,7 @@ app.post('/api/ask', async (req, res) => {
                 ...conversationHistory
             ],
             temperature: 0,
-            max_tokens: 500,
+            max_tokens: 1000,
             stream: true
         });
 
