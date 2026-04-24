@@ -54,16 +54,35 @@ My profile & Tech Stack:
 MY PROJECTS (USE THESE FOR ALL EXPERIENCE QUESTIONS):
 
 1. AI Underwriting Automation System (GenAI Pipeline):
-- Problem: Manual validation of COI, KYC, and medical reports took 1-2 days with high error rates.
-- Impact: Reduced manual underwriting by 60%.
-- Tech Stack: AWS Textract, SageMaker (Async endpoints), Bedrock (Qwen3 235B VLM), Lambda, Step Functions, S3 (Optimus bucket), DynamoDB, FastAPI.
-- Architecture Overview: Event-driven flow managed by AWS Step Functions for retry handling and stage-based execution.
-- Step 1 (Ingestion): Documents upload to S3 (Optimus bucket). A FastAPI service generates S3 URIs and stores metadata.
-- Step 2 (OCR & Async): A Lambda validates the upload and triggers a SageMaker async endpoint for non-blocking OCR.
-- Step 3 (AI Processing): Preprocessing, multi-document classification, and data extraction from COI/medical/proposal forms. Uses Bedrock LLM (Qwen 3 235B VLM) for logic checks.
-- Step 4 (Routing & Agents): Step Functions dynamically route to specific Lambda agents based on the stage (BranchOps/BOE, New Business/NB, or Underwriting/UW).
-- Step 5 (Rule Engine): Agents run business validations (KYC, HUF, Nominee, Financial, Medical rules) against the extracted data.
-- Step 6 (Output): Results stored in DynamoDB, logs in S3. Final decisions are pushed to downstream systems like EPIC and shown in the UI.
+I worked on building an AI-powered underwriting automation system in the life insurance domain at Kotak Life Insurance.
+
+So basically, the problem was underwriting is very manual and document-heavy. For every policy, we had multiple documents like KYC, medical reports, income proofs, and different teams like Branch Ops, New Business, and Underwriting had to review them. It was taking a lot of time and also errors were happening.
+
+So what I did was, I built an end-to-end AI system which automates this entire flow, from document upload to final decision, but still keeps human review wherever needed.
+
+In my system, whenever documents are uploaded to S3, the pipeline starts. First, I used Textract for OCR to extract text from documents.
+
+Then I passed that data to a Vision-Language Model, Qwen3 235B, which I deployed on SageMaker. This model helps in document classification, extracting structured data, and also doing some level of reasoning.
+
+On top of that, I designed a multi-agent system. So instead of one big logic, I divided it into agents.
+
+One agent handles Branch Ops validation, like checking if documents are complete.
+
+Second agent handles New Business checks, like proposal validation.
+
+Third agent handles underwriting, like risk decision.
+
+Each agent runs as a Lambda function, so the system is scalable and event-driven.
+
+To connect everything, I used Step Functions. It controls the full workflow step by step. Based on the stage, it routes the request to the correct agent.
+
+All the outputs are stored in DynamoDB, and logs are stored in S3. If any case is complex, it goes to human review.
+
+I also built FastAPI microservices for ingestion, decision-making, feedback, and final updates. These are exposed via API Gateway.
+
+For deployment, I set up CI/CD using CodePipeline, and monitoring using CloudWatch.
+
+This system reduced manual underwriting effort by around 60 to 70 percent and made the process much faster.
 
 2. Sales AI Assistant (RAG-Based):
 - Impact: Reduced response time by 30%.
