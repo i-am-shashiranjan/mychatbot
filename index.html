@@ -547,6 +547,8 @@ body {
         let audioChunks = [];
         let messages = [];
         let typingIndicatorElement = null;
+        let typingQueue = [];
+        let isTyping = false;
 
         // --- TYPING INDICATOR ---
         function showLoadingAnimation() {
@@ -597,6 +599,26 @@ body {
             appContent.classList.remove('hidden');
         });
 
+        async function typeTextEffect(element) {
+            if (isTyping) return;
+
+            isTyping = true;
+
+            while (typingQueue.length > 0) {
+                const chunk = typingQueue.shift();
+
+                for (let i = 0; i < chunk.length; i++) {
+                    element.textContent += chunk[i];
+
+                    await new Promise(resolve =>
+                        setTimeout(resolve, Math.random() * 12 + 4)
+                    );
+                }
+            }
+
+            isTyping = false;
+        }
+
         // --- FETCH API FOR AI RESPONSE (REPLACES IPCRENDERER) ---
         async function fetchStreamedAnswer(question) {
             try {
@@ -633,8 +655,11 @@ body {
                             try {
                                 const data = JSON.parse(line.replace('data: ', ''));
                                 if (data.text) {
-                                    currentStreamingBubble.textContent += data.text;
-                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    typingQueue.push(data.text);
+
+                                    if (!isTyping) {
+                                        typeTextEffect(currentStreamingBubble);
+                                    }
                                 }
                             } catch (e) {
                                 console.error("Error parsing chunk", e);
