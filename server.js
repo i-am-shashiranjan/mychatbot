@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const cors = require('cors');
 const OpenAI = require('openai');
+const crypto = require('crypto');
 
 // Load environment variables (used for local testing, ignored on Render)
 require('dotenv').config();
@@ -28,6 +29,81 @@ const openai = new OpenAI({
 
 // Memory
 let conversationHistory = [];
+
+
+// ==================== SEMANTIC CACHE ====================
+const CACHE_THRESHOLD = 0.92;
+const MAX_CACHE_SIZE  = 200;
+const CACHE_TTL_MS    = 2 * 60 * 60 * 1000; // 2 hours
+const semanticCache   = [];
+const exactCache = {};
+
+function cosineSimilarity(a, b) {
+    let dot = 0, normA = 0, normB = 0;
+    for (let i = 0; i < a.length; i++) {
+        dot += a[i] * b[i]; normA += a[i] * a[i]; normB += b[i] * b[i];
+    }
+    return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function getEmbedding(text) {
+    const res = await openai.embeddings.create({
+        model: 'text-embedding-3-small',
+        input: text.trim().toLowerCase(),
+    });
+    return res.data[0].embedding;
+}
+
+async function findCachedAnswer(embedding) {
+    const now = Date.now();
+    for (const entry of semanticCache) {
+        if (now - entry.timestamp > CACHE_TTL_MS) continue;
+        if (cosineSimilarity(embedding, entry.embedding) >= CACHE_THRESHOLD) {
+            console.log('[Cache HIT]');
+            return entry.answer;
+        }
+    }
+    return null;
+}
+
+function saveToCache(embedding, answer) {
+    if (semanticCache.length >= MAX_CACHE_SIZE) {
+        semanticCache.sort((a, b) => a.timestamp - b.timestamp);
+        semanticCache.splice(0, 10);
+    }
+    semanticCache.push({ embedding, answer, timestamp: Date.now() });
+    console.log(`[Cache SAVE] size=${semanticCache.length}`);
+}
+
+// ==================== INTERVIEW MEMORY ====================
+const interviewMemory = { topicsAsked: new Set(), followUpCount: {}, interviewStage: 'unknown' };
+
+function updateInterviewMemory(question) {
+    const q = question.toLowerCase();
+    if (/tell me about|introduce yourself/.test(q))           interviewMemory.interviewStage = 'intro';
+    else if (/salary|ctc|compensation|notice|offer/.test(q))  interviewMemory.interviewStage = 'hr';
+    else if (/design|architect|scale|system/.test(q))         interviewMemory.interviewStage = 'system_design';
+    else if (/code|implement|algorithm|complexity/.test(q))   interviewMemory.interviewStage = 'coding';
+    else if (/why|strength|weakness|challenge|team/.test(q))  interviewMemory.interviewStage = 'behavioral';
+    else                                                       interviewMemory.interviewStage = 'technical';
+
+    ['rag','langchain','pinecone','lambda','sagemaker','bedrock','textract',
+     'dynamodb','s3','docker','eks','fastapi','gpt','llm','mlops','qwen','python','sql']
+    .forEach(kw => {
+        if (q.includes(kw)) {
+            interviewMemory.topicsAsked.add(kw);
+            interviewMemory.followUpCount[kw] = (interviewMemory.followUpCount[kw] || 0) + 1;
+        }
+    });
+}
+
+function buildMemoryContext() {
+    const topics   = [...interviewMemory.topicsAsked].join(', ') || 'none yet';
+    const repeated = Object.entries(interviewMemory.followUpCount)
+        .filter(([, v]) => v > 1).map(([k, v]) => `${k}(x${v})`).join(', ') || 'none';
+    return `\nSESSION MEMORY:\n- Stage: ${interviewMemory.interviewStage}\n- Topics covered: ${topics}\n- Repeated topics: ${repeated}\nDo not re-explain already covered topics. Go deeper instead.\n`;
+}
+// =========================================================
 
 
 // ==================================================
@@ -228,7 +304,7 @@ Use natural story format.
 Salary:
 Confident but flexible.
 
-Notice Period:
+Notice Period 90days:
 Professional and realistic.
 
 System Design:
@@ -413,6 +489,10 @@ connect answers to real project experience.
 // Endpoint 1: Clear Memory (When you hit the refresh button)
 app.post('/api/reset', (req, res) => {
     conversationHistory = [];
+    semanticCache.length = 0;
+    interviewMemory.topicsAsked.clear();
+    interviewMemory.followUpCount  = {};
+    interviewMemory.interviewStage = 'unknown';
     res.json({ success: true });
 });
 
@@ -456,7 +536,36 @@ app.post('/api/ask', async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // Layer 1: exact match — zero API cost, instant
+    const exactKey = question.trim().toLowerCase();
+    
+    if (exactCache[exactKey]) {
+        for (const word of exactCache[exactKey].split(' ')) {
+            res.write(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`);
+            await new Promise(r => setTimeout(r, 18));
+        }
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+        return;
+    }
+
     // Add user question to memory
+    // Cache check
+    const embedding    = await getEmbedding(question);
+    
+    const cachedAnswer = await findCachedAnswer(embedding);
+    
+    if (cachedAnswer) {
+        for (const word of cachedAnswer.split(' ')) {
+            res.write(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`);
+            await new Promise(r => setTimeout(r, 18));
+        }
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+        return;
+    }
+    // Memory update
+    updateInterviewMemory(question);
     conversationHistory.push({ role: "user", content: question });
     
     // Safeguard: Keep only the last 6 messages
@@ -466,7 +575,7 @@ app.post('/api/ask', async (req, res) => {
 
     try {
         const stream = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "gpt-4o-mini",
             messages: [
                 { role: "system", content: MASTER_SYSTEM_PROMPT },
                 // { role: "system", content: RESPONSE_STYLE_PROMPT },
@@ -477,10 +586,11 @@ app.post('/api/ask', async (req, res) => {
                 // { role: "system", content: SYSTEM_DESIGN_PROMPT },
                 { role: "system", content: HR_NEGOTIATION_PROMPT },
                 { role: "system", content: RESPONSE_STYLE_PROMPT },
+                { role: "system", content: buildMemoryContext() },
                 ...conversationHistory
             ],
             temperature: 0.4,
-            max_tokens: 800,
+            max_tokens: /code|implement|algorithm|design|architect/.test(question.toLowerCase()) ? 800 : 300,
             stream: true
         });
 
@@ -498,7 +608,12 @@ app.post('/api/ask', async (req, res) => {
         // Save final answer to memory
         if (fullAnswer.trim().length > 0) {
             conversationHistory.push({ role: "assistant", content: fullAnswer });
+            saveToCache(embedding, fullAnswer);
+            exactCache[exactKey] = fullAnswer;
+
         }
+
+        
         
         // Signal the frontend that the stream is finished
         res.write(`data: [DONE]\n\n`);
