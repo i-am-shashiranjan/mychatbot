@@ -415,6 +415,8 @@
             flex-direction: column;
             gap: 3px;
             max-width: 78%;
+            min-width: 0;         /* ✅ prevents bubble from overflowing */
+            overflow: hidden;     /* ✅ clips content to bubble width */
         }
 
         .message-user .message-bubble-wrap { align-items: flex-end; }
@@ -441,6 +443,8 @@
             border: 1px solid var(--border-soft);
             border-bottom-left-radius: 5px;
             box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+            max-width: 100%;      /* ✅ stops content pushing bubble wider */
+            overflow: hidden; 
         }
 
         .msg-time {
@@ -653,6 +657,67 @@
             .mic-button { width: 64px; height: 64px; }
             .mic-button i { font-size: 20px; }
         }
+
+        /* ── CODE BLOCK (ChatGPT style) ── */
+        .code-block-wrapper {
+            background: #0d0d0d;
+            border-radius: 10px;
+            margin: 8px 0;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+            font-size: 13px;
+        }
+
+        .code-block-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #1e1e1e;
+            padding: 7px 14px;
+            font-size: 12px;
+            color: #aaa;
+            font-family: 'DM Sans', sans-serif;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .code-block-header .copy-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 2px 6px;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .code-block-header .copy-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .code-block-wrapper pre {
+            margin: 0;
+            padding: 14px 16px;
+            overflow-x: auto;
+            background: #0d0d0d;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+
+        .code-block-wrapper code {
+            font-family: 'Courier New', Courier, monospace;
+            color: #e5e7eb;
+            white-space: pre;        /* keeps code formatting */
+            font-size: 12px;         /* slightly smaller to fit mobile */
+            line-height: 1.6;
+            display: block;
+            width: max-content;      /* lets code scroll internally */
+        }
+
     </style>
 </head>
 <body>
@@ -803,7 +868,7 @@
                 messageDiv.innerHTML = `
                     <div class="msg-avatar"><i class="fas fa-robot"></i></div>
                     <div class="message-bubble-wrap">
-                        <div class="message-content">${escapeHtml(text)}</div>
+                        <div class="message-content">${formatMessage(text)}</div>
                         <span class="msg-time">${getTime()}</span>
                     </div>`;
             }
@@ -817,6 +882,25 @@
             const d = document.createElement('div');
             d.textContent = str;
             return d.innerHTML;
+        }
+
+        function formatMessage(text) {
+            // Detect ```lang ... ``` code blocks
+            return text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+                const language = lang || 'code';
+                const escaped = escapeHtml(code.trim());
+                return `<div class="code-block-wrapper">
+                    <div class="code-block-header">
+                        <span>${language}</span>
+                        <button class="copy-btn" onclick="navigator.clipboard.writeText(this.dataset.code)
+                            .then(() => { this.innerHTML = '<i class=\\'fas fa-check\\'></i> Copied!'; setTimeout(() => this.innerHTML = '<i class=\\'fas fa-copy\\'></i> Copy code', 2000); })"
+                            data-code="${escapeHtml(code.trim())}">
+                            <i class="fas fa-copy"></i> Copy code
+                        </button>
+                    </div>
+                    <pre><code>${escaped}</code></pre>
+                </div>`;
+            });
         }
 
         function updateStatus(text) {
@@ -860,7 +944,7 @@
 
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message message-ai';
-                let currentStreamingBubble = document.createElement('div');
+                const currentStreamingBubble = document.createElement('div');
                 currentStreamingBubble.className = 'message-content';
                 const wrap = document.createElement('div');
                 wrap.className = 'message-bubble-wrap';
@@ -872,6 +956,9 @@
                 messageDiv.appendChild(wrap);
                 chatMessages.appendChild(messageDiv);
 
+                // ✅ NEW: collect full raw text first, render at end
+                let fullRawText = '';
+
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
@@ -882,21 +969,26 @@
                             try {
                                 const data = JSON.parse(line.replace('data: ', ''));
                                 if (data.text) {
-                                    typingQueue.push(data.text);
-                                    if (!isTyping) typeTextEffect(currentStreamingBubble);
+                                    fullRawText += data.text;
+
+                                    // ✅ Show plain text while streaming (no formatting yet)
+                                    currentStreamingBubble.textContent = fullRawText;
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
                                 }
                             } catch (e) { console.error("Error parsing chunk", e); }
                         }
                     }
                 }
 
-                // Add timestamp after stream completes
+                // ✅ Stream done — now render with full formatting (code blocks, etc.)
+                currentStreamingBubble.innerHTML = formatMessage(fullRawText);
+
                 const timeEl = document.createElement('span');
                 timeEl.className = 'msg-time';
                 timeEl.textContent = getTime();
                 wrap.appendChild(timeEl);
 
-                messages.push({ text: currentStreamingBubble.textContent, isUser: false });
+                messages.push({ text: fullRawText, isUser: false });
                 updateStatus('Press microphone or spacebar to start recording');
                 chatMessages.scrollTop = chatMessages.scrollHeight;
 
