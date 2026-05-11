@@ -958,24 +958,43 @@
 
                 // ✅ NEW: collect full raw text first, render at end
                 let fullRawText = '';
+                let buffer = '';
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
-                    const chunkStr = decoder.decode(value);
-                    const lines = chunkStr.split('\n');
-                    for (const line of lines) {
-                        if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-                            try {
-                                const data = JSON.parse(line.replace('data: ', ''));
-                                if (data.text) {
-                                    fullRawText += data.text;
 
-                                    // ✅ Show plain text while streaming (no formatting yet)
-                                    currentStreamingBubble.textContent = fullRawText;
-                                    chatMessages.scrollTop = chatMessages.scrollHeight;
-                                }
-                            } catch (e) { console.error("Error parsing chunk", e); }
+                    buffer += decoder.decode(value, { stream: true });
+
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop(); // keep incomplete SSE event for next chunk
+
+                    for (const event of events) {
+                        const line = event
+                            .split('\n')
+                            .find(l => l.startsWith('data: '));
+
+                        if (!line) continue;
+
+                        const payload = line.replace('data: ', '').trim();
+
+                        if (payload === '[DONE]') {
+                            break;
+                        }
+
+                        try {
+                            const data = JSON.parse(payload);
+
+                            if (data.text) {
+                                fullRawText += data.text;
+                                currentStreamingBubble.textContent = fullRawText;
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                                // Force browser/mobile UI repaint
+                                await new Promise(requestAnimationFrame);
+                            }
+                        } catch (e) {
+                            console.error("Error parsing SSE chunk:", e, payload);
                         }
                     }
                 }
