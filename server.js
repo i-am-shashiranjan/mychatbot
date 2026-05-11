@@ -7,34 +7,27 @@ const cors = require('cors');
 const OpenAI = require('openai');
 const crypto = require('crypto');
 
-// Load environment variables (used for local testing, ignored on Render)
 require('dotenv').config();
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
-// Serve the index.html frontend to the browser
-app.use(express.static(path.join(__dirname))); 
+app.use(express.static(path.join(__dirname)));
 
-// Setup Multer to handle audio file uploads from the frontend
 const upload = multer({ dest: os.tmpdir() });
 
-// Initialize OpenAI (Make sure you set OPENAI_API_KEY in Render.com's environment variables)
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, 
+  apiKey: process.env.OPENAI_API_KEY,
   maxRetries: 3,
 });
 
-// Memory
 let conversationHistory = [];
-
 
 // ==================== SEMANTIC CACHE ====================
 const CACHE_THRESHOLD = 0.92;
 const MAX_CACHE_SIZE  = 200;
-const CACHE_TTL_MS    = 2 * 60 * 60 * 1000; // 2 hours
+const CACHE_TTL_MS    = 2 * 60 * 60 * 1000;
 const semanticCache   = [];
 const exactCache = {};
 
@@ -107,14 +100,14 @@ function buildMemoryContext() {
 
 
 // ==================================================
-// 1. CORE SYSTEM PROMPT
-//==================================================
+// SYSTEM PROMPTS
+// ==================================================
 
 const MASTER_SYSTEM_PROMPT = `
 
-You are a real-time AI interview copilot.
+You are a real-time AI interview copilot for GenAI Engineer, AI Engineer, and GenAI Developer interviews.
 
-The user is in a live interview.
+The user is in a live interview role for GenAI Engineer/AI Engineer/GenAI Developer.
 
 Generate answers like a real engineer speaking naturally in interviews.
 
@@ -166,15 +159,15 @@ or
 
 Use this speaking style:
 
-"Hi, I’m Shashi. Currently, I’m working as a Senior Manager in Data Science and MLOps at Kotak Life Insurance, with around 3 years of experience in building AI and machine learning solutions.
+"Hi, I'm Shashi. Currently, I'm working as a Senior Manager in Data Science and MLOps at Kotak Life Insurance, with around 3 years of experience in building AI and machine learning solutions.
 
-I mainly work on end-to-end ML pipelines and deploy scalable systems using AWS services like S3, Lambda, DynamoDB, and SageMaker. Recently, I’ve also been working on GenAI use cases like RAG and document processing using Bedrock.
+I mainly work on end-to-end ML pipelines and deploy scalable systems using AWS services like S3, Lambda, DynamoDB, and SageMaker. Recently, I've also been working on GenAI use cases like RAG and document processing using Bedrock.
 
 One of my key projects was building an OCR and document classification system for underwriting, where I used Textract and LLMs to extract data from documents. This helped reduce manual work and improved efficiency.
 
 I also have experience in deploying applications using Docker, EKS, and CI/CD pipelines, with a focus on performance and cost optimization.
 
-Now, I’m looking for opportunities to work more deeply in the GenAI space and build real-world AI applications."
+Now, I'm looking for opportunities to work more deeply in the GenAI space and build real-world AI applications."
 
 ==================================================
 
@@ -254,10 +247,6 @@ Work:
 
 `;
 
-// ==================================================
-// 4. INTERVIEW ROUTER PROMPT
-// ==========================
-
 const INTERVIEW_ROUTER_PROMPT = `
 
 First identify the interview type from the latest interviewer question.
@@ -312,11 +301,6 @@ Architecture + tradeoffs + scaling.
 
 `;
 
-
-// ==================================================
-// 6. CODING INTERVIEW PROMPT
-// ==========================
-
 const CODING_PROMPT = `
 
 For coding interviews:
@@ -356,12 +340,6 @@ CSS
 Do NOT use markdown backticks.
 
 `;
-
-
-
-// ==================================================
-// 8. HR + NEGOTIATION PROMPT
-// ==========================
 
 const HR_NEGOTIATION_PROMPT = `
 
@@ -486,7 +464,19 @@ connect answers to real project experience.
 
 `;
 
-// Endpoint 1: Clear Memory (When you hit the refresh button)
+// ✅ FIX 1: Merge all prompts into ONE combined string (was 7 separate messages before)
+// This reduces tokens sent to OpenAI and speeds up time-to-first-response
+const COMBINED_SYSTEM = [
+    MASTER_SYSTEM_PROMPT,
+    PROJECT_CONTEXT_PROMPT,
+    INTERVIEW_ROUTER_PROMPT,
+    CODING_PROMPT,
+    HR_NEGOTIATION_PROMPT,
+    RESPONSE_STYLE_PROMPT,
+].join('\n\n---\n\n');
+
+
+// Endpoint 1: Clear Memory
 app.post('/api/reset', (req, res) => {
     conversationHistory = [];
     semanticCache.length = 0;
@@ -496,14 +486,13 @@ app.post('/api/reset', (req, res) => {
     res.json({ success: true });
 });
 
-// Endpoint 2: Process Audio (When you finish recording)
+// Endpoint 2: Process Audio
 app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ error: "No audio file provided" });
         }
-        
-        // Whisper requires a file extension to recognize the format
+
         const tempFilePath = req.file.path + '.webm';
         fs.renameSync(req.file.path, tempFilePath);
 
@@ -513,7 +502,6 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
             language: 'en'
         });
 
-        // Delete the temporary audio file
         fs.unlinkSync(tempFilePath);
 
         res.json({ text: transcription.text });
@@ -526,77 +514,68 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
 // Endpoint 3: Stream the AI Answer
 app.post('/api/ask', async (req, res) => {
     const { question } = req.body;
-    
+
     if (!question) {
         return res.status(400).json({ error: "Question is required" });
     }
 
-    // Prepare headers for Server-Sent Events (Real-time Streaming)
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // Layer 1: exact match — zero API cost, instant
+    // Layer 1: Exact match cache — zero API cost, instant
     const exactKey = question.trim().toLowerCase();
-    
+
     if (exactCache[exactKey]) {
         for (const word of exactCache[exactKey].split(' ')) {
             res.write(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`);
-            await new Promise(r => setTimeout(r, 18));
+            // ✅ FIX 4: Reduced delay from 18ms → 8ms for faster cache replay
+            await new Promise(r => setTimeout(r, 8));
         }
         res.write(`data: [DONE]\n\n`);
         res.end();
         return;
     }
 
-    // Add user question to memory
-    // Cache check
-    const embedding    = await getEmbedding(question);
-    
-    const cachedAnswer = await findCachedAnswer(embedding);
-    
-    if (cachedAnswer) {
-        for (const word of cachedAnswer.split(' ')) {
-            res.write(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`);
-            await new Promise(r => setTimeout(r, 18));
-        }
-        res.write(`data: [DONE]\n\n`);
-        res.end();
-        return;
-    }
-    // Memory update
     updateInterviewMemory(question);
     conversationHistory.push({ role: "user", content: question });
-    
-    // Safeguard: Keep only the last 6 messages
+
     if (conversationHistory.length > 7) {
         conversationHistory = conversationHistory.slice(conversationHistory.length - 7);
     }
+
+    // ✅ FIX 2: Start embedding in BACKGROUND — don't await it here
+    // Old code: awaited embedding BEFORE streaming → delayed every response
+    // New code: embedding runs in parallel while stream is already sending tokens
+    const embeddingPromise = getEmbedding(question);
+
+    // ✅ FIX 3: Reduced max_tokens from 300 → 150 for normal answers
+    // Your prompt already says "3–6 lines", so 150 tokens is enough
+    // Fewer max_tokens = model finishes faster
+    // const isTechnical = /code|implement|algorithm|design|architect/.test(question.toLowerCase());
+    // AFTER - three levels: project explanation, coding, and short answers
+    const q = question.toLowerCase();
+    const isCoding     = /code|implement|algorithm|complexity/.test(q);
+    const isLongAnswer = /explain|describe|tell me about|walk me through|underwriting|architecture|project|system design|scale/.test(q);
+
+    const maxTokens = isCoding ? 900 : isLongAnswer ? 700 : 150;
+
 
     try {
         const stream = await openai.chat.completions.create({
             model: "gpt-4o-mini",
             messages: [
-                { role: "system", content: MASTER_SYSTEM_PROMPT },
-                // { role: "system", content: RESPONSE_STYLE_PROMPT },
-                { role: "system", content: PROJECT_CONTEXT_PROMPT },
-                { role: "system", content: INTERVIEW_ROUTER_PROMPT },
-                // { role: "system", content: FOLLOWUP_DEFENSE_PROMPT },
-                { role: "system", content: CODING_PROMPT },
-                // { role: "system", content: SYSTEM_DESIGN_PROMPT },
-                { role: "system", content: HR_NEGOTIATION_PROMPT },
-                { role: "system", content: RESPONSE_STYLE_PROMPT },
-                { role: "system", content: buildMemoryContext() },
+                // ✅ FIX 1 APPLIED HERE: Only 1 system message instead of 7
+                { role: "system", content: COMBINED_SYSTEM + '\n\n' + buildMemoryContext() },
                 ...conversationHistory
             ],
             temperature: 0.4,
-            max_tokens: /code|implement|algorithm|design|architect/.test(question.toLowerCase()) ? 800 : 300,
+            max_tokens: maxTokens,  // ✅ FIX 3 APPLIED HERE
             stream: true
         });
 
         let fullAnswer = "";
-        
-        // Push words to the frontend instantly as they generate
+
         for await (const chunk of stream) {
             const content = chunk.choices[0]?.delta?.content || "";
             if (content) {
@@ -604,20 +583,18 @@ app.post('/api/ask', async (req, res) => {
                 res.write(`data: ${JSON.stringify({ text: content })}\n\n`);
             }
         }
-        
-        // Save final answer to memory
-        if (fullAnswer.trim().length > 0) {
-            conversationHistory.push({ role: "assistant", content: fullAnswer });
-            saveToCache(embedding, fullAnswer);
-            exactCache[exactKey] = fullAnswer;
 
-        }
-
-        
-        
-        // Signal the frontend that the stream is finished
         res.write(`data: [DONE]\n\n`);
         res.end();
+
+        // ✅ FIX 2 APPLIED HERE: Save to cache AFTER response is sent to user
+        // User already got their answer — now we do the embedding save in background
+        if (fullAnswer.trim()) {
+            conversationHistory.push({ role: "assistant", content: fullAnswer });
+            exactCache[exactKey] = fullAnswer;
+            const embedding = await embeddingPromise;  // resolve now, after stream done
+            saveToCache(embedding, fullAnswer);
+        }
 
     } catch (error) {
         console.error("OpenAI Error:", error);
@@ -626,7 +603,6 @@ app.post('/api/ask', async (req, res) => {
     }
 });
 
-// Start the server (Render will assign the PORT automatically)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Web server running on port ${PORT}`);
