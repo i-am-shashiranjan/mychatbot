@@ -519,19 +519,24 @@ app.post('/api/ask', async (req, res) => {
         return res.status(400).json({ error: "Question is required" });
     }
 
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+
+    // Immediately flush headers so browser starts receiving stream
+    if (res.flushHeaders) {
+        res.flushHeaders();
+    }
+
+    // Send first ping to open stream immediately
+    res.write(`: stream-start\n\n`);
 
     // Layer 1: Exact match cache — zero API cost, instant
     const exactKey = question.trim().toLowerCase();
 
     if (exactCache[exactKey]) {
-        for (const word of exactCache[exactKey].split(' ')) {
-            res.write(`data: ${JSON.stringify({ text: word + ' ' })}\n\n`);
-            // ✅ FIX 4: Reduced delay from 18ms → 8ms for faster cache replay
-            await new Promise(r => setTimeout(r, 8));
-        }
+        res.write(`data: ${JSON.stringify({ text: exactCache[exactKey] })}\n\n`);
         res.write(`data: [DONE]\n\n`);
         res.end();
         return;
