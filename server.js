@@ -563,7 +563,7 @@ app.post('/api/ask', async (req, res) => {
     const isCoding     = /code|implement|algorithm|complexity/.test(q);
     const isLongAnswer = /explain|describe|tell me about|walk me through|underwriting|architecture|project|system design|scale/.test(q);
 
-    const maxTokens = isCoding ? 900 : isLongAnswer ? 700 : 150;
+    const maxTokens = isCoding ? 1500 : isLongAnswer ? 1100 : 450;
 
 
     try {
