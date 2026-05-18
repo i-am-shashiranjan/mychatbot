@@ -941,12 +941,29 @@
         function formatMessage(text) {
             if (!text) return '';
 
+            // ✅ Fallback: if AI sends plain Python code without ```python,
+            // automatically convert it into a code block.
+            const hasCodeFence = /```/.test(text);
+            const looksLikePythonCode =
+                /(^|\n)\s*def\s+\w+\s*\(.*\)\s*:/.test(text) ||
+                /(^|\n)\s*for\s+.+\s+in\s+.+:/.test(text) ||
+                /(^|\n)\s*if\s+.+:/.test(text) ||
+                /(^|\n)\s*while\s+.+:/.test(text);
+
+            if (!hasCodeFence && looksLikePythonCode) {
+                text = text.replace(
+                    /((?:\s*(?:def|for|if|while|return|print|[a-zA-Z_]\w*\s*=|[a-zA-Z_]\w*\.).*(?:\n|$))+)/,
+                    '\n```python\n$1\n```\n'
+                );
+            }
+
             const codeBlocks = [];
 
             // 1. Temporarily protect code blocks
             let safeText = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
                 const language = lang || 'code';
                 const escaped = escapeHtml(code.trim());
+                const rawCode = escapeHtml(code.trim());
                 const id = `__CODE_BLOCK_${codeBlocks.length}__`;
 
                 codeBlocks.push(`<div class="code-block-wrapper">
@@ -954,7 +971,7 @@
                         <span>${language}</span>
                         <button class="copy-btn" onclick="navigator.clipboard.writeText(this.dataset.code)
                             .then(() => { this.innerHTML = '<i class=\\'fas fa-check\\'></i> Copied!'; setTimeout(() => this.innerHTML = '<i class=\\'fas fa-copy\\'></i> Copy code', 2000); })"
-                            data-code="${escapeHtml(code.trim())}">
+                            data-code="${rawCode}">
                             <i class="fas fa-copy"></i> Copy code
                         </button>
                     </div>
@@ -970,12 +987,12 @@
             // 3. Convert markdown-style bold
             safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-            // 4. Convert headings like ### Title
+            // 4. Convert headings
             safeText = safeText.replace(/^###\s*(.*)$/gm, '<h3>$1</h3>');
             safeText = safeText.replace(/^##\s*(.*)$/gm, '<h3>$1</h3>');
             safeText = safeText.replace(/^#\s*(.*)$/gm, '<h3>$1</h3>');
 
-            // 5. Convert numbered lines into readable blocks
+            // 5. Convert numbered lines
             safeText = safeText.replace(/(?:^|\n)(\d+)\.\s+/g, '\n<br><strong>$1.</strong> ');
 
             // 6. Convert bullet lines
@@ -991,7 +1008,6 @@
                     if (
                         part.startsWith('<h3>') ||
                         part.startsWith('<ul>') ||
-                        part.startsWith('<div class="code-block-wrapper">') ||
                         part.includes('__CODE_BLOCK_')
                     ) {
                         return part;
