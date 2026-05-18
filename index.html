@@ -447,6 +447,60 @@
             overflow: hidden; 
         }
 
+        /* ✅ Better AI answer formatting */
+        .message-ai .message-content {
+            white-space: normal;
+        }
+
+        .message-ai .message-content p {
+            margin: 0 0 10px;
+        }
+
+        .message-ai .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .message-ai .message-content strong {
+            color: #fde68a; 
+            font-weight: 700;
+        }
+
+        .message-ai .message-content h3 {
+            font-size: 15.5px;
+            margin: 12px 0 8px;
+            color: #ffffff;
+            font-weight: 700;
+        }
+
+        .message-ai .message-content ul,
+        .message-ai .message-content ol {
+            margin: 8px 0 10px 20px;
+            padding-left: 10px;
+        }
+
+        .message-ai .message-content li {
+            margin-bottom: 6px;
+            line-height: 1.55;
+        }
+
+        .message-ai .message-content .answer-section {
+            margin-bottom: 12px;
+        }
+
+        .message-ai .message-content .answer-title {
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 6px;
+        }
+
+        .message-ai .message-content .highlight-box {
+            background: rgba(124, 58, 237, 0.12);
+            border-left: 3px solid var(--primary-light);
+            padding: 8px 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
         .msg-time {
             font-size: 10px;
             color: var(--text-muted);
@@ -885,11 +939,17 @@
         }
 
         function formatMessage(text) {
-            // Detect ```lang ... ``` code blocks
-            return text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
+            if (!text) return '';
+
+            const codeBlocks = [];
+
+            // 1. Temporarily protect code blocks
+            let safeText = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (match, lang, code) => {
                 const language = lang || 'code';
                 const escaped = escapeHtml(code.trim());
-                return `<div class="code-block-wrapper">
+                const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+
+                codeBlocks.push(`<div class="code-block-wrapper">
                     <div class="code-block-header">
                         <span>${language}</span>
                         <button class="copy-btn" onclick="navigator.clipboard.writeText(this.dataset.code)
@@ -899,8 +959,54 @@
                         </button>
                     </div>
                     <pre><code>${escaped}</code></pre>
-                </div>`;
+                </div>`);
+
+                return id;
             });
+
+            // 2. Escape normal text
+            safeText = escapeHtml(safeText);
+
+            // 3. Convert markdown-style bold
+            safeText = safeText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // 4. Convert headings like ### Title
+            safeText = safeText.replace(/^###\s*(.*)$/gm, '<h3>$1</h3>');
+            safeText = safeText.replace(/^##\s*(.*)$/gm, '<h3>$1</h3>');
+            safeText = safeText.replace(/^#\s*(.*)$/gm, '<h3>$1</h3>');
+
+            // 5. Convert numbered lines into readable blocks
+            safeText = safeText.replace(/(?:^|\n)(\d+)\.\s+/g, '\n<br><strong>$1.</strong> ');
+
+            // 6. Convert bullet lines
+            safeText = safeText.replace(/(?:^|\n)[*-]\s+(.*)/g, '<li>$1</li>');
+            safeText = safeText.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+
+            // 7. Convert line breaks into paragraphs
+            const parts = safeText
+                .split(/\n{2,}/)
+                .map(part => part.trim())
+                .filter(Boolean)
+                .map(part => {
+                    if (
+                        part.startsWith('<h3>') ||
+                        part.startsWith('<ul>') ||
+                        part.startsWith('<div class="code-block-wrapper">') ||
+                        part.includes('__CODE_BLOCK_')
+                    ) {
+                        return part;
+                    }
+                    return `<p>${part.replace(/\n/g, '<br>')}</p>`;
+                });
+
+            let html = parts.join('');
+
+            // 8. Restore code blocks
+            codeBlocks.forEach((block, index) => {
+                html = html.replace(`__CODE_BLOCK_${index}__`, block);
+            });
+
+            return html;
         }
 
         function updateStatus(text) {
@@ -987,7 +1093,10 @@
 
                             if (data.text) {
                                 fullRawText += data.text;
-                                currentStreamingBubble.textContent = fullRawText;
+
+                                // ✅ Show formatted text while streaming
+                                currentStreamingBubble.innerHTML = formatMessage(fullRawText);
+
                                 chatMessages.scrollTop = chatMessages.scrollHeight;
 
                                 // Force browser/mobile UI repaint
