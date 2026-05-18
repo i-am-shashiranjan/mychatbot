@@ -337,7 +337,18 @@ Node.js
 HTML
 CSS
 
-Do NOT use markdown backticks.
+IMPORTANT CODE FORMAT RULE:
+
+Whenever answer contains code, always wrap the full code inside markdown triple backticks with language name.
+
+Use this exact format:
+
+\`\`\`python
+def example():
+    return "hello"
+\`\`\`
+
+Never send code as plain text.
 
 `;
 
